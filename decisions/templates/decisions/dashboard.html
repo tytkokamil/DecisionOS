@@ -1,0 +1,139 @@
+﻿{% extends 'decisions/base.html' %}
+
+{% block title %}Dashboard - DecisionOS{% endblock %}
+
+{% block content %}
+<!-- STATS DASHBOARD -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total }}</div>
+        <div class="stat-label">Total Decisions</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.active }}</div>
+        <div class="stat-label">Active</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.completed }}</div>
+        <div class="stat-label">Completed</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.draft }}</div>
+        <div class="stat-label">Drafts</div>
+    </div>
+</div>
+
+<!-- SEARCH & FILTER BAR -->
+<div class="card" style="margin-bottom: 2rem;">
+    <form method="get" style="display: flex; gap: 1rem; align-items: end;">
+        <div style="flex: 1;">
+            <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;">🔍 Search</label>
+            <input 
+                type="text" 
+                name="search" 
+                value="{{ search }}"
+                placeholder="Search decisions..."
+                class="form-control"
+                style="margin: 0;"
+            >
+        </div>
+        
+        <div style="min-width: 200px;">
+            <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;">🎯 Filter Status</label>
+            <select name="status" class="form-control" style="margin: 0;">
+                <option value="">All Statuses</option>
+                <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>Draft</option>
+                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>Completed</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="btn" style="padding: 1rem 2rem;">
+            Filter
+        </button>
+        
+        {% if search or status_filter %}
+        <a href="{% url 'decisions:dashboard' %}" class="btn btn-secondary" style="padding: 1rem 2rem;">
+            Clear
+        </a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- HEADER WITH CREATE BUTTON -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3rem;">
+    <h2 style="font-size: 2.5rem; background: linear-gradient(135deg, #ffffff 0%, #00ff88 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+        ⚡ Mission Control
+    </h2>
+    <a href="{% url 'decisions:decision_create' %}" class="btn">
+        <span style="font-size: 1.2rem;">+</span> New Decision
+    </a>
+</div>
+
+{% if decisions %}
+<div class="grid">
+    {% for decision in decisions %}
+    <div class="decision-card">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+            <h3>{{ decision.title }}</h3>
+        </div>
+        
+        <p>{{ decision.description|truncatewords:25 }}</p>
+        
+        <div style="margin: 1.5rem 0;">
+            {% if decision.status == 'draft' %}
+            <span class="badge badge-draft">🟡 Draft</span>
+            {% elif decision.status == 'active' %}
+            <span class="badge badge-active">🟢 Active</span>
+            {% else %}
+            <span class="badge badge-completed">🔵 Completed</span>
+            {% endif %}
+        </div>
+        
+        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+            📅 {{ decision.created_at|date:"d.m.Y H:i" }}
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <a href="{% url 'decisions:decision_detail' decision.pk %}" class="btn" style="text-align: center; padding: 0.75rem;">
+                View →
+            </a>
+            <a href="{% url 'decisions:decision_edit' decision.pk %}" class="btn btn-secondary" style="text-align: center; padding: 0.75rem;">
+                Edit
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<!-- EMPTY STATE -->
+<div class="card" style="text-align: center; padding: 5rem 2rem; border: 2px dashed var(--border);">
+    <div style="font-size: 5rem; margin-bottom: 2rem;">🚀</div>
+    <h3 style="font-size: 2rem; margin-bottom: 1rem; color: var(--text-primary);">
+        {% if search or status_filter %}
+        No Results Found
+        {% else %}
+        Launch Your First Decision
+        {% endif %}
+    </h3>
+    <p style="color: var(--text-secondary); font-size: 1.1rem; margin-bottom: 3rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+        {% if search or status_filter %}
+        Try different search terms or clear filters
+        {% else %}
+        Every great mission starts with a decision. Create your first one and let AI help you analyze it.
+        {% endif %}
+    </p>
+    <div style="display: flex; gap: 1rem; justify-content: center;">
+        {% if search or status_filter %}
+        <a href="{% url 'decisions:dashboard' %}" class="btn">
+            Clear Filters
+        </a>
+        {% else %}
+        <a href="{% url 'decisions:decision_create' %}" class="btn" style="font-size: 1.1rem; padding: 1.25rem 2.5rem;">
+            🚀 Create First Decision
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

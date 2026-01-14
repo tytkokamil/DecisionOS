@@ -1,0 +1,415 @@
+﻿from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.http import JsonResponse
+from django.db.models import Q
+from django.utils import timezone
+from django.contrib.auth.models import User
+from .models import Team, TeamMember, Decision, DecisionOption, DecisionReview, DecisionAudit, DecisionAttachment
+from .permissions import permission_service
+from .analytics import analytics_service
+from .ai_service import ai_service
+import json
+
+# ==================== DASHBOARD ====================
+@login_required
+def dashboard(request):
+    """Main dashboard with KPIs"""
+    user_teams = permission_service.get_user_teams(request.user)
+    
+    if not user_teams.exists():
+        return render(request, 'decisions/no_team.html')
+    
+    # Get decisions across all user teams
+    decisions = Decision.objects.filter(
+        team__in=[tm.team for tm in user_teams]
+    ).select_related('team', 'created_by', 'assigned_to')
+    
+    # Search & Filter
+    search = request.GET.get('search', '')
+    if search:
+        decisions = decisions.filter(
+            Q(title__icontains=search) | Q(description__icontains=search)
+        )
+    
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        decisions = decisions.filter(status=status_filter)
+    
+    priority_filter = request.GET.get('priority', '')
+    if priority_filter:
+        decisions = decisions.filter(priority=priority_filter)
+    
+    team_filter = request.GET.get('team', '')
+    if team_filter:
+        decisions = decisions.filter(team_id=team_filter)
+    
+    decisions = decisions.order_by('-created_at')[:50]
+    
+    # KPIs
+    user_stats = analytics_service.get_user_stats(request.user)
+    
+    # Reviews pending for user
+    pending_reviews = Review.objects.filter(
+        reviewer=request.user,
+        status='pending'
+    ).select_related('decision')[:5]
+    
+    context = {
+        'decisions': decisions,
+        'user_teams': user_teams,
+        'user_stats': user_stats,
+        'pending_reviews': pending_reviews,
+        'search': search,
+        'status_filter': status_filter,
+        'priority_filter': priority_filter,
+        'team_filter': team_filter,
+    }
+    
+    return render(request, 'decisions/dashboard.html', context)
+
+# ==================== TEAMS ====================
+@login_required
+def teams_list(request):
+    """List all teams user belongs to"""
+    user_teams = TeamMember.objects.filter(user=request.user).select_related('team')
+    
+    teams_data = []
+    for tm in user_teams:
+        kpis = analytics_service.get_team_kpis(tm.team)
+        teams_data.append({
+            'team_member': tm,
+            'kpis': kpis
+        })
+    
+    context = {
+        'teams_data': teams_data,
+    }
+    
+    return render(request, 'decisions/teams_list.html', context)
+
+@login_required
+def team_detail(request, team_id):
+    """Team detail with members and stats"""
+    team = get_object_or_404(Team, id=team_id)
+    
+    # Check if user is member
+    user_membership = TeamMember.objects.filter(user=request.user, team=team).first()
+    if not user_membership:
+        messages.error(request, 'No access to this team.')
+        return redirect('decisions:teams_list')
+    
+    # Get all members
+    members = TeamMember.objects.filter(team=team).select_related('user')
+    
+    # Get team KPIs
+    kpis = analytics_service.get_team_kpis(team)
+    
+    # Recent decisions
+    recent_decisions = Decision.objects.filter(team=team).order_by('-created_at')[:10]
+    
+    context = {
+        'team': team,
+        'user_membership': user_membership,
+        'members': members,
+        'kpis': kpis,
+        'recent_decisions': recent_decisions,
+    }
+    
+    return render(request, 'decisions/team_detail.html', context)
+
+# ==================== DECISION CRUD ====================
+@login_required
+def decision_create(request):
+    """Create new decision"""
+    user_teams = permission_service.get_user_teams(request.user)
+    
+    if not user_teams.exists():
+        messages.error(request, 'You need to be part of a team to create decisions.')
+        return redirect('decisions:dashboard')
+    
+    if request.method == 'POST':
+        team_id = request.POST.get('team')
+        team = get_object_or_404(Team, id=team_id)
+        
+        decision = Decision.objects.create(
+            title=request.POST.get('title'),
+            description=request.POST.get('description'),
+            team=team,
+            created_by=request.user,
+            priority=request.POST.get('priority', 'medium'),
+            assigned_to_id=request.POST.get('assigned_to') if request.POST.get('assigned_to') else None,
+        )
+        
+        # Audit log
+        AuditLog.objects.create(
+            decision=decision,
+            user=request.user,
+            action='created',
+            details=f'Decision "{decision.title}" created'
+        )
+        
+        messages.success(request, f'🚀 Decision "{decision.title}" created!')
+        return redirect('decisions:decision_detail', pk=decision.pk)
+    
+    # Get team members for assignment
+    team_members = {}
+    for tm in user_teams:
+        members = User.objects.filter(
+            teammember__team=tm.team
+        ).distinct()
+        team_members[tm.team.id] = list(members)
+    
+    context = {
+        'user_teams': user_teams,
+        'team_members': json.dumps({k: [{'id': u.id, 'name': u.username} for u in v] for k, v in team_members.items()})
+    }
+    
+    return render(request, 'decisions/decision_form.html', context)
+
+@login_required
+def decision_detail(request, pk):
+    """View decision details"""
+    decision = get_object_or_404(Decision, pk=pk)
+    
+    if not permission_service.can_view_decision(request.user, decision):
+        messages.error(request, 'No permission to view this decision.')
+        return redirect('decisions:dashboard')
+    
+    # Get related data
+    comments = decision.comments.select_related('user').order_by('created_at')
+    reviews = decision.reviews.select_related('reviewer').order_by('-created_at')
+    versions = decision.versions.select_related('changed_by').order_by('-version')
+    audit_logs = decision.audit_logs.select_related('user').order_by('-timestamp')[:20]
+    ai_analyses = decision.ai_analyses.order_by('-created_at')
+    
+    # User permissions
+    can_edit = permission_service.can_edit_decision(request.user, decision)
+    can_review = permission_service.can_review_decision(request.user, decision)
+    can_approve = permission_service.can_approve_decision(request.user, decision)
+    
+    # Check if user already reviewed
+    user_review = reviews.filter(reviewer=request.user).first()
+    
+    context = {
+        'decision': decision,
+        'comments': comments,
+        'reviews': reviews,
+        'versions': versions,
+        'audit_logs': audit_logs,
+        'ai_analyses': ai_analyses,
+        'can_edit': can_edit,
+        'can_review': can_review,
+        'can_approve': can_approve,
+        'user_review': user_review,
+    }
+    
+    return render(request, 'decisions/decision_detail.html', context)
+
+@login_required
+def decision_edit(request, pk):
+    """Edit decision"""
+    decision = get_object_or_404(Decision, pk=pk)
+    
+    if not permission_service.can_edit_decision(request.user, decision):
+        messages.error(request, 'No permission to edit this decision.')
+        return redirect('decisions:decision_detail', pk=pk)
+    
+    if request.method == 'POST':
+        # Create version before update
+        DecisionVersion.objects.create(
+            decision=decision,
+            version=decision.version,
+            title=decision.title,
+            description=decision.description,
+            status=decision.status,
+            changed_by=request.user,
+            change_summary=request.POST.get('change_summary', 'Updated')
+        )
+        
+        # Update decision
+        decision.title = request.POST.get('title')
+        decision.description = request.POST.get('description')
+        decision.priority = request.POST.get('priority')
+        decision.assigned_to_id = request.POST.get('assigned_to') if request.POST.get('assigned_to') else None
+        decision.version += 1
+        decision.save()
+        
+        # Audit log
+        AuditLog.objects.create(
+            decision=decision,
+            user=request.user,
+            action='updated',
+            details=f'Decision updated: {request.POST.get("change_summary", "No summary")}'
+        )
+        
+        messages.success(request, '✅ Decision updated!')
+        return redirect('decisions:decision_detail', pk=decision.pk)
+    
+    team_members = User.objects.filter(
+        teammember__team=decision.team
+    ).distinct()
+    
+    context = {
+        'decision': decision,
+        'team_members': team_members,
+        'action': 'Edit'
+    }
+    
+    return render(request, 'decisions/decision_edit.html', context)
+
+@login_required
+def decision_delete(request, pk):
+    """Delete decision"""
+    decision = get_object_or_404(Decision, pk=pk)
+    
+    if not permission_service.can_edit_decision(request.user, decision):
+        messages.error(request, 'No permission to delete this decision.')
+        return redirect('decisions:decision_detail', pk=pk)
+    
+    if request.method == 'POST':
+        title = decision.title
+        decision.delete()
+        messages.success(request, f'🗑️ Decision "{title}" deleted!')
+        return redirect('decisions:dashboard')
+    
+    return render(request, 'decisions/decision_confirm_delete.html', {'decision': decision})
+
+# ==================== STATUS & WORKFLOW ====================
+@login_required
+def decision_change_status(request, pk):
+    """Change decision status"""
+    decision = get_object_or_404(Decision, pk=pk)
+    
+    if not permission_service.can_edit_decision(request.user, decision):
+        return JsonResponse({'success': False, 'message': 'No permission'})
+    
+    new_status = request.POST.get('status')
+    old_status = decision.status
+    
+    decision.status = new_status
+    
+    if new_status == 'approved':
+        decision.decision_date = timezone.now()
+    elif new_status == 'implemented':
+        decision.implemented_date = timezone.now()
+    
+    decision.save()
+    
+    # Audit log
+    AuditLog.objects.create(
+        decision=decision,
+        user=request.user,
+        action='status_changed',
+        details=f'Status changed from {old_status} to {new_status}'
+    )
+    
+    return JsonResponse({'success': True})
+
+# ==================== REVIEWS ====================
+@login_required
+def decision_submit_review(request, pk):
+    """Submit review for decision"""
+    decision = get_object_or_404(Decision, pk=pk)
+    
+    if not permission_service.can_review_decision(request.user, decision):
+        messages.error(request, 'No permission to review this decision.')
+        return redirect('decisions:decision_detail', pk=pk)
+    
+    if request.method == 'POST':
+        review_status = request.POST.get('review_status')
+        comment = request.POST.get('comment')
+        
+        review, created = Review.objects.update_or_create(
+            decision=decision,
+            reviewer=request.user,
+            defaults={
+                'status': review_status,
+                'comment': comment,
+                'reviewed_at': timezone.now()
+            }
+        )
+        
+        # Audit log
+        AuditLog.objects.create(
+            decision=decision,
+            user=request.user,
+            action='reviewed',
+            details=f'Review submitted: {review_status}'
+        )
+        
+        messages.success(request, f'✅ Review submitted: {review.get_status_display()}')
+        return redirect('decisions:decision_detail', pk=pk)
+    
+    return redirect('decisions:decision_detail', pk=pk)
+
+# ==================== COMMENTS ====================
+@login_required
+def decision_add_comment(request, pk):
+    """Add comment to decision"""
+    decision = get_object_or_404(Decision, pk=pk)
+    
+    if not permission_service.can_view_decision(request.user, decision):
+        return JsonResponse({'success': False, 'message': 'No permission'})
+    
+    text = request.POST.get('text')
+    
+    comment = Comment.objects.create(
+        decision=decision,
+        user=request.user,
+        text=text
+    )
+    
+    return JsonResponse({
+        'success': True,
+        'comment': {
+            'user': request.user.username,
+            'text': comment.text,
+            'created_at': comment.created_at.strftime('%d.%m.%Y %H:%M')
+        }
+    })
+
+# ==================== AI ====================
+@login_required
+def ai_analyze(request, pk):
+    """AI analysis endpoint"""
+    decision = get_object_or_404(Decision, pk=pk)
+    
+    if not permission_service.can_view_decision(request.user, decision):
+        return JsonResponse({'success': False, 'message': 'No permission'})
+    
+    result = ai_service.analyze_decision(decision, [], [])
+    
+    if result['success']:
+        AIAnalysis.objects.create(
+            decision=decision,
+            analysis_type='analysis',
+            content=result['analysis']
+        )
+    
+    return JsonResponse(result)
+
+# ==================== TEAM KPIs ====================
+@login_required
+def team_kpis(request, team_id):
+    """View team KPIs"""
+    team = get_object_or_404(Team, id=team_id)
+    
+    # Check if user is member
+    if not TeamMember.objects.filter(user=request.user, team=team).exists():
+        messages.error(request, 'No access to this team.')
+        return redirect('decisions:dashboard')
+    
+    kpis = analytics_service.get_team_kpis(team)
+    
+    # Recent decisions
+    decisions = Decision.objects.filter(team=team).order_by('-created_at')[:10]
+    
+    context = {
+        'team': team,
+        'kpis': kpis,
+        'decisions': decisions,
+    }
+    
+    return render(request, 'decisions/team_kpis.html', context)
+

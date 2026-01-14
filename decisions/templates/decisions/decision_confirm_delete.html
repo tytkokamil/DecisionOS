@@ -1,0 +1,32 @@
+﻿{% extends 'decisions/base.html' %}
+
+{% block title %}Delete Decision - DecisionOS{% endblock %}
+
+{% block content %}
+<div style="max-width: 700px; margin: 5rem auto;">
+    <div class="card" style="border: 2px solid var(--danger); text-align: center;">
+        <div style="font-size: 5rem; margin-bottom: 1rem;">⚠️</div>
+        <h2 style="color: var(--danger); margin-bottom: 1.5rem;">Confirm Deletion</h2>
+        
+        <p style="color: var(--text-primary); font-size: 1.2rem; margin-bottom: 1rem;">
+            Delete "<strong>{{ decision.title }}</strong>"?
+        </p>
+        
+        <p style="color: var(--text-secondary); margin-bottom: 3rem;">
+            This action is irreversible. All data will be permanently lost.
+        </p>
+        
+        <form method="post">
+            {% csrf_token %}
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button type="submit" class="btn btn-danger" style="padding: 1.25rem 3rem;">
+                    🗑️ Yes, Delete Forever
+                </button>
+                <a href="{% url 'decisions:decision_detail' decision.pk %}" class="btn btn-secondary" style="padding: 1.25rem 3rem;">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

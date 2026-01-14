@@ -1,0 +1,86 @@
+﻿{% extends 'decisions/base.html' %}
+
+{% block title %}Create Decision - DecisionOS{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto;">
+    <div style="margin-bottom: 2rem;">
+        <a href="{% url 'decisions:dashboard' %}" style="color: var(--accent); text-decoration: none;">← Back to Dashboard</a>
+    </div>
+    
+    <div class="card">
+        <h2>🚀 Create New Decision</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+            Create a structured decision with team context, priority, and AI support.
+        </p>
+        
+        <form method="post" id="decisionForm">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label>👥 Team *</label>
+                <select name="team" id="teamSelect" class="form-control" required onchange="updateAssignees()">
+                    <option value="">Select Team</option>
+                    {% for tm in user_teams %}
+                    <option value="{{ tm.team.id }}">{{ tm.team.name }} ({{ tm.get_role_display }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>⚡ Title *</label>
+                <input type="text" name="title" class="form-control" required placeholder="What decision needs to be made?">
+            </div>
+            
+            <div class="form-group">
+                <label>📝 Description *</label>
+                <textarea name="description" class="form-control" required rows="6" placeholder="Describe the decision context, background, and key considerations..."></textarea>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                <div class="form-group">
+                    <label>🎯 Priority</label>
+                    <select name="priority" class="form-control">
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>👤 Assign To</label>
+                    <select name="assigned_to" id="assignSelect" class="form-control">
+                        <option value="">Unassigned</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                <button type="submit" class="btn" style="flex: 1;">🚀 Create Decision</button>
+                <a href="{% url 'decisions:dashboard' %}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const teamMembers = {{ team_members|safe }};
+
+function updateAssignees() {
+    const teamId = document.getElementById('teamSelect').value;
+    const assignSelect = document.getElementById('assignSelect');
+    
+    assignSelect.innerHTML = '<option value="">Unassigned</option>';
+    
+    if (teamId && teamMembers[teamId]) {
+        teamMembers[teamId].forEach(member => {
+            const option = document.createElement('option');
+            option.value = member.id;
+            option.textContent = member.name;
+            assignSelect.appendChild(option);
+        });
+    }
+}
+</script>
+{% endblock %}

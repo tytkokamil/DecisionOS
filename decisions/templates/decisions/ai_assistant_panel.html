@@ -1,0 +1,52 @@
+<!-- AI Assistant Panel - Add this to decision_detail.html -->
+<div class="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border-2 border-purple-200 p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                </svg>
+            </div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-900">🤖 AI Assistant</h2>
+                <p class="text-sm text-gray-600">Powered by GPT-4</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="ai-panel-content" class="space-y-4">
+        <!-- AI Actions -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <button onclick="aiAnalyze()" 
+                    class="bg-white hover:bg-purple-50 border-2 border-purple-200 rounded-lg p-3 text-center transition">
+                <div class="text-2xl mb-1">🔍</div>
+                <div class="text-sm font-semibold text-gray-700">Analyze</div>
+            </button>
+            
+            <button onclick="aiGenerateAlternatives()" 
+                    class="bg-white hover:bg-purple-50 border-2 border-purple-200 rounded-lg p-3 text-center transition">
+                <div class="text-2xl mb-1">💡</div>
+                <div class="text-sm font-semibold text-gray-700">Alternatives</div>
+            </button>
+            
+            <button onclick="aiGenerateSummary()" 
+                    class="bg-white hover:bg-purple-50 border-2 border-purple-200 rounded-lg p-3 text-center transition">
+                <div class="text-2xl mb-1">📄</div>
+                <div class="text-sm font-semibold text-gray-700">Summary</div>
+            </button>
+        </div>
+
+        <!-- AI Results -->
+        <div id="ai-results" class="hidden mt-4">
+            <div class="bg-white rounded-lg border border-purple-200 p-4">
+                <div id="ai-loading" class="hidden text-center py-8">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-purple-600 border-t-transparent"></div>
+                    <p class="mt-2 text-gray-600">AI is thinking...</p>
+                </div>
+                <div id="ai-content"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/ai_assistant.js"></script>

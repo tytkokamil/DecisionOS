@@ -1,0 +1,84 @@
+﻿{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Template Library</h1>
+        <p class="text-gray-600">Start decisions faster with pre-built templates</p>
+    </div>
+
+    <!-- Search & Filter -->
+    <div class="mb-6 flex gap-4">
+        <input type="text" 
+               placeholder="Search templates..." 
+               class="flex-1 px-4 py-2 border rounded-lg"
+               id="search"
+               value="{{ request.GET.search }}">
+        
+        <select class="px-4 py-2 border rounded-lg" id="category">
+            <option value="">All Categories</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}" {% if selected_category == cat.id|stringformat:'s' %}selected{% endif %}>
+                {{ cat.icon }} {{ cat.name }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- Templates Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for template in templates %}
+        <div class="bg-white rounded-lg shadow-sm border hover:shadow-md transition p-6">
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ template.name }}</h3>
+                    {% if template.category %}
+                    <span class="text-sm text-gray-500">{{ template.category.icon }} {{ template.category.name }}</span>
+                    {% endif %}
+                </div>
+                <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                    {{ template.usage_count }} uses
+                </span>
+            </div>
+            
+            <p class="text-gray-600 text-sm mb-4 line-clamp-3">{{ template.description }}</p>
+            
+            <div class="flex gap-2">
+                <a href="{% url 'decisions:template_detail' template.id %}" 
+                   class="flex-1 text-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                    Preview
+                </a>
+                <a href="{% url 'decisions:create_from_template' template.id %}" 
+                   class="flex-1 text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Use Template
+                </a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-3 text-center py-12">
+            <p class="text-gray-500">No templates found</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+// Search & Filter
+document.getElementById('search').addEventListener('input', function(e) {
+    updateUrl();
+});
+
+document.getElementById('category').addEventListener('change', function(e) {
+    updateUrl();
+});
+
+function updateUrl() {
+    const search = document.getElementById('search').value;
+    const category = document.getElementById('category').value;
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (category) params.set('category', category);
+    window.location.search = params.toString();
+}
+</script>
+{% endblock %}

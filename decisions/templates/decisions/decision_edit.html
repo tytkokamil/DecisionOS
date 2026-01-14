@@ -1,0 +1,75 @@
+{% extends 'decisions/base.html' %}
+
+{% block title %}Edit Decision - DecisionOS{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto;">
+  <div style="margin-bottom: 2rem;">
+    <a href="{% url 'decisions:decision_detail' decision.pk %}" style="color: var(--accent); text-decoration: none;">← Back</a>
+  </div>
+
+  <div class="card">
+    <h2>✏️ Edit Decision</h2>
+
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="form-group">
+        <label>⚡ Title *</label>
+        <input type="text" name="title" value="{{ decision.title }}" class="form-control" required>
+      </div>
+
+      <div class="form-group">
+        <label>📝 Description *</label>
+        <textarea name="description" class="form-control" rows="8" required>{{ decision.description }}</textarea>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+          <label>🎯 Priority</label>
+          <select name="priority" class="form-control">
+            <option value="low" {% if decision.priority == 'low' %}selected{% endif %}>Low</option>
+            <option value="medium" {% if decision.priority == 'medium' %}selected{% endif %}>Medium</option>
+            <option value="high" {% if decision.priority == 'high' %}selected{% endif %}>High</option>
+            <option value="critical" {% if decision.priority == 'critical' %}selected{% endif %}>Critical</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>⏰ Due Date</label>
+          <input type="datetime-local" name="due_date" class="form-control" value="{% if decision.due_date %}{{ decision.due_date|date:'Y-m-d\TH:i' }}{% endif %}">
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+          <label>👤 Assign To</label>
+          <select name="assigned_to" id="assignedToSelect" class="form-control">
+            <option value="">Unassigned</option>
+            {% for m in team_members %}
+              <option value="{{ m.user_id }}" {% if decision.assigned_to_id == m.user_id %}selected{% endif %}>
+                {{ m.user.get_full_name|default:m.user.username }} ({{ m.role }})
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>📈 Impact Score (0–100)</label>
+          <input type="number" name="impact_score" class="form-control" min="0" max="100" value="{{ decision.impact_score|default:0 }}">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>🏷️ Tags</label>
+        <input type="text" name="tags" class="form-control" value="{{ decision.tags }}" placeholder="comma,separated,tags">
+      </div>
+
+      <div style="display:flex; gap: 0.75rem; margin-top: 1.5rem;">
+        <button type="submit" class="btn">Save</button>
+        <a class="btn btn-secondary" href="{% url 'decisions:decision_detail' decision.pk %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

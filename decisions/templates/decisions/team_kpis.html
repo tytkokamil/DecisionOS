@@ -1,0 +1,103 @@
+﻿{% extends 'decisions/base.html' %}
+
+{% block title %}{{ team.name }} KPIs - DecisionOS{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+    <a href="{% url 'decisions:dashboard' %}" style="color: var(--accent); text-decoration: none;">← Back to Dashboard</a>
+</div>
+
+<div class="card">
+    <h2>📊 {{ team.name }} - Team KPIs</h2>
+</div>
+
+<!-- KPI STATS -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ kpis.total_decisions }}</div>
+        <div class="stat-label">Total Decisions</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ kpis.avg_duration_days }}</div>
+        <div class="stat-label">Avg Duration (Days)</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ kpis.implementation_rate }}%</div>
+        <div class="stat-label">Implementation Rate</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ kpis.bottlenecks }}</div>
+        <div class="stat-label">Bottlenecks</div>
+    </div>
+</div>
+
+<!-- STATUS BREAKDOWN -->
+<div class="card">
+    <h3 style="margin-bottom: 1.5rem;">📋 Status Breakdown</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 8px; text-align: center;">
+            <div style="font-size: 2rem; font-weight: 700; color: var(--warning);">{{ kpis.draft }}</div>
+            <div style="color: var(--text-secondary);">Draft</div>
+        </div>
+        <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 8px; text-align: center;">
+            <div style="font-size: 2rem; font-weight: 700; color: #00ccff;">{{ kpis.review }}</div>
+            <div style="color: var(--text-secondary);">In Review</div>
+        </div>
+        <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 8px; text-align: center;">
+            <div style="font-size: 2rem; font-weight: 700; color: var(--accent);">{{ kpis.approved }}</div>
+            <div style="color: var(--text-secondary);">Approved</div>
+        </div>
+        <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 8px; text-align: center;">
+            <div style="font-size: 2rem; font-weight: 700; color: var(--accent);">{{ kpis.implemented }}</div>
+            <div style="color: var(--text-secondary);">Implemented</div>
+        </div>
+    </div>
+</div>
+
+<!-- RECENT DECISIONS -->
+<div class="card">
+    <h3 style="margin-bottom: 1.5rem;">🔥 Recent Decisions</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for decision in decisions %}
+            <tr>
+                <td>
+                    <a href="{% url 'decisions:decision_detail' decision.pk %}" style="color: var(--accent); text-decoration: none;">
+                        {{ decision.title }}
+                    </a>
+                </td>
+                <td>
+                    {% if decision.status == 'draft' %}
+                    <span class="badge badge-draft">Draft</span>
+                    {% elif decision.status == 'review' %}
+                    <span class="badge" style="background: rgba(0, 204, 255, 0.2); color: #00ccff;">In Review</span>
+                    {% elif decision.status == 'approved' %}
+                    <span class="badge badge-active">Approved</span>
+                    {% else %}
+                    <span class="badge badge-completed">Implemented</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if decision.priority == 'critical' %}
+                    <span class="badge" style="background: rgba(255, 51, 51, 0.2); color: var(--danger);">Critical</span>
+                    {% elif decision.priority == 'high' %}
+                    <span class="badge" style="background: rgba(255, 170, 0, 0.2); color: var(--warning);">High</span>
+                    {% else %}
+                    <span class="badge" style="background: rgba(0, 255, 136, 0.2); color: var(--accent);">{{ decision.get_priority_display }}</span>
+                    {% endif %}
+                </td>
+                <td style="color: var(--text-secondary);">{{ decision.created_at|date:"d.m.Y" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,172 @@
+﻿{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-3xl">
+    <!-- Header -->
+    <div class="mb-8">
+        <a href="{% url 'decisions:template_detail' template.id %}" class="text-blue-600 hover:text-blue-800 mb-2 inline-block">
+            ← Back to Template
+        </a>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Create Decision from Template</h1>
+        <p class="text-gray-600">{{ template.name }}</p>
+    </div>
+
+    <!-- Form -->
+    <form method="post" class="space-y-6">
+        {% csrf_token %}
+
+        <!-- Team Selection -->
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <h2 class="text-lg font-semibold mb-4">Basic Information</h2>
+            
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Team <span class="text-red-500">*</span>
+                </label>
+                <select name="team" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="">Select a team...</option>
+                    {% for team in teams %}
+                    <option value="{{ team.id }}">{{ team.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Decision Title <span class="text-red-500">*</span>
+                </label>
+                <input type="text" 
+                       name="title" 
+                       required
+                       placeholder="{{ template.default_title_pattern }}"
+                       value="{{ template.default_title_pattern }}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                </label>
+                <textarea name="description" 
+                          rows="4"
+                          placeholder="Enter decision description..."
+                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">{{ template.default_description }}</textarea>
+            </div>
+        </div>
+
+        <!-- Custom Fields -->
+        {% if fields %}
+        <div class="bg-white rounded-lg shadow-sm border p-6">
+            <h2 class="text-lg font-semibold mb-4">Template Fields</h2>
+            
+            <div class="space-y-4">
+                {% for field in fields %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ field.label }}
+                        {% if field.is_required %}<span class="text-red-500">*</span>{% endif %}
+                    </label>
+                    
+                    {% if field.help_text %}
+                    <p class="text-sm text-gray-600 mb-2">{{ field.help_text }}</p>
+                    {% endif %}
+
+                    {% if field.field_type == 'text' %}
+                        <input type="text" 
+                               name="field_{{ field.id }}" 
+                               {% if field.is_required %}required{% endif %}
+                               placeholder="{{ field.placeholder }}"
+                               value="{{ field.default_value }}"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    
+                    {% elif field.field_type == 'textarea' %}
+                        <textarea name="field_{{ field.id }}" 
+                                  {% if field.is_required %}required{% endif %}
+                                  rows="3"
+                                  placeholder="{{ field.placeholder }}"
+                                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">{{ field.default_value }}</textarea>
+                    
+                    {% elif field.field_type == 'number' %}
+                        <input type="number" 
+                               name="field_{{ field.id }}" 
+                               {% if field.is_required %}required{% endif %}
+                               placeholder="{{ field.placeholder }}"
+                               value="{{ field.default_value }}"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    
+                    {% elif field.field_type == 'currency' %}
+                        <div class="relative">
+                            <span class="absolute left-3 top-2 text-gray-500">$</span>
+                            <input type="number" 
+                                   name="field_{{ field.id }}" 
+                                   {% if field.is_required %}required{% endif %}
+                                   step="0.01"
+                                   placeholder="{{ field.placeholder }}"
+                                   value="{{ field.default_value }}"
+                                   class="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    
+                    {% elif field.field_type == 'date' %}
+                        <input type="date" 
+                               name="field_{{ field.id }}" 
+                               {% if field.is_required %}required{% endif %}
+                               value="{{ field.default_value }}"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    
+                    {% elif field.field_type == 'select' %}
+                        <select name="field_{{ field.id }}" 
+                                {% if field.is_required %}required{% endif %}
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select an option...</option>
+                            {% for option in field.options %}
+                            <option value="{{ option }}" {% if option == field.default_value %}selected{% endif %}>{{ option }}</option>
+                            {% endfor %}
+                        </select>
+                    
+                    {% elif field.field_type == 'checkbox' %}
+                        <label class="flex items-center">
+                            <input type="checkbox" 
+                                   name="field_{{ field.id }}" 
+                                   value="true"
+                                   {% if field.default_value == 'true' %}checked{% endif %}
+                                   class="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500">
+                            <span class="ml-2 text-sm text-gray-700">{{ field.placeholder|default:"Yes" }}</span>
+                        </label>
+                    
+                    {% elif field.field_type == 'url' %}
+                        <input type="url" 
+                               name="field_{{ field.id }}" 
+                               {% if field.is_required %}required{% endif %}
+                               placeholder="{{ field.placeholder }}"
+                               value="{{ field.default_value }}"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    
+                    {% elif field.field_type == 'email' %}
+                        <input type="email" 
+                               name="field_{{ field.id }}" 
+                               {% if field.is_required %}required{% endif %}
+                               placeholder="{{ field.placeholder }}"
+                               value="{{ field.default_value }}"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Actions -->
+        <div class="flex gap-4">
+            <a href="{% url 'decisions:template_detail' template.id %}" 
+               class="flex-1 text-center px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                Cancel
+            </a>
+            <button type="submit" 
+                    class="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                Create Decision
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

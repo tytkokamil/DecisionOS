@@ -1,0 +1,67 @@
+{% extends 'decisions/base.html' %}
+{% block title %}Analytics - DecisionOS{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:2rem;">
+  <div>
+    <h1 style="font-size:2.5rem; margin-bottom:0.25rem;">📊 Analytics</h1>
+    <div style="color:var(--text-secondary);">Overview for your teams</div>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-value">{{ metrics.total }}</div>
+    <div class="stat-label">Total Decisions</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ metrics.by_status.approved|default:0 }}</div>
+    <div class="stat-label">Approved</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ metrics.by_status.review|default:0 }}</div>
+    <div class="stat-label">In Review</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{% if metrics.avg_cycle_days %}{{ metrics.avg_cycle_days|floatformat:1 }}{% else %}—{% endif %}</div>
+    <div class="stat-label">Avg Cycle Days</div>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));">
+  <div class="card">
+    <h2 style="margin-bottom:1rem;">Status Distribution</h2>
+    <canvas id="statusChart" height="180"></canvas>
+  </div>
+  <div class="card">
+    <h2 style="margin-bottom:1rem;">Priority Distribution</h2>
+    <canvas id="priorityChart" height="180"></canvas>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const statusLabels = {{ status_labels_json|safe }};
+const statusCounts = {{ status_counts_json|safe }};
+const priorityLabels = {{ priority_labels_json|safe }};
+const priorityCounts = {{ priority_counts_json|safe }};
+
+function buildBarChart(ctx, labels, data, title){
+  return new Chart(ctx, {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ label: title, data: data }] },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#a0a0a0' }, grid: { color: 'rgba(255,255,255,0.06)' } },
+        y: { ticks: { color: '#a0a0a0' }, grid: { color: 'rgba(255,255,255,0.06)' } }
+      }
+    }
+  });
+}
+
+buildBarChart(document.getElementById('statusChart'), statusLabels, statusCounts, 'Status');
+buildBarChart(document.getElementById('priorityChart'), priorityLabels, priorityCounts, 'Priority');
+</script>
+{% endblock %}

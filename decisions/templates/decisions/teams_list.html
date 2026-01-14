@@ -1,0 +1,51 @@
+﻿{% extends 'decisions/base.html' %}
+
+{% block title %}My Teams - DecisionOS{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h2 style="font-size: 2rem;">👥 My Teams</h2>
+</div>
+
+{% if teams_data %}
+<div class="grid">
+    {% for data in teams_data %}
+    <a href="{% url 'decisions:team_detail' data.team_member.team.id %}" style="text-decoration: none; color: inherit;">
+        <div class="card clickable">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.5rem;">
+                <div>
+                    <h3 style="margin-bottom: 0.5rem;">{{ data.team_member.team.name }}</h3>
+                    <span class="badge" style="background: rgba(0, 255, 136, 0.2); color: var(--accent);">
+                        {{ data.team_member.get_role_display }}
+                    </span>
+                </div>
+            </div>
+            
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                {{ data.team_member.team.description|default:"No description" }}
+            </p>
+            
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+                <div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent);">{{ data.kpis.total_decisions }}</div>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem;">Total Decisions</div>
+                </div>
+                <div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--warning);">{{ data.kpis.review }}</div>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem;">In Review</div>
+                </div>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align: center; padding: 4rem 2rem;">
+    <div style="font-size: 5rem; margin-bottom: 2rem;">👥</div>
+    <h3 style="font-size: 1.8rem; margin-bottom: 1rem;">No Teams Yet</h3>
+    <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+        Contact your administrator to be added to a team.
+    </p>
+</div>
+{% endif %}
+{% endblock %}

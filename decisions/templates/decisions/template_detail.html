@@ -1,0 +1,105 @@
+﻿{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-4xl">
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <a href="{% url 'decisions:template_library' %}" class="text-blue-600 hover:text-blue-800 mb-2 inline-block">
+                    ← Back to Templates
+                </a>
+                <h1 class="text-3xl font-bold text-gray-900">{{ template.name }}</h1>
+                {% if template.category %}
+                <p class="text-gray-600">{{ template.category.icon }} {{ template.category.name }}</p>
+                {% endif %}
+            </div>
+            <div class="text-right">
+                <div class="text-sm text-gray-500 mb-2">Used {{ template.usage_count }} times</div>
+                <a href="{% url 'decisions:create_from_template' template.id %}" 
+                   class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                    Use This Template
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Description -->
+    <div class="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-3">Description</h2>
+        <p class="text-gray-700 whitespace-pre-line">{{ template.description }}</p>
+    </div>
+
+    <!-- Default Content -->
+    {% if template.default_title_pattern or template.default_description %}
+    <div class="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-3">Default Content</h2>
+        
+        {% if template.default_title_pattern %}
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Title Pattern</label>
+            <div class="px-3 py-2 bg-gray-50 rounded border text-sm font-mono">
+                {{ template.default_title_pattern }}
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if template.default_description %}
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description Template</label>
+            <div class="px-3 py-2 bg-gray-50 rounded border text-sm whitespace-pre-line">
+                {{ template.default_description }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Custom Fields -->
+    {% if fields %}
+    <div class="bg-white rounded-lg shadow-sm border p-6">
+        <h2 class="text-xl font-semibold mb-4">Custom Fields ({{ fields.count }})</h2>
+        
+        <div class="space-y-4">
+            {% for field in fields %}
+            <div class="border-l-4 border-blue-500 pl-4 py-2">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="font-medium text-gray-900">
+                            {{ field.label }}
+                            {% if field.is_required %}
+                            <span class="text-red-500">*</span>
+                            {% endif %}
+                        </div>
+                        {% if field.help_text %}
+                        <p class="text-sm text-gray-600 mt-1">{{ field.help_text }}</p>
+                        {% endif %}
+                        {% if field.placeholder %}
+                        <p class="text-xs text-gray-500 mt-1">Placeholder: "{{ field.placeholder }}"</p>
+                        {% endif %}
+                    </div>
+                    <span class="ml-4 px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                        {{ field.get_field_type_display }}
+                    </span>
+                </div>
+                
+                {% if field.options %}
+                <div class="mt-2 text-sm text-gray-600">
+                    Options: {{ field.options|join:", " }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Metadata -->
+    <div class="mt-6 text-sm text-gray-500">
+        <p>Created {{ template.created_at|date:"F d, Y" }}</p>
+        {% if template.created_by %}
+        <p>By {{ template.created_by.get_full_name|default:template.created_by.username }}</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

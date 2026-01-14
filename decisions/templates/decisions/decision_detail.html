@@ -1,0 +1,470 @@
+﻿{% extends 'decisions/base.html' %}
+
+{% block title %}{{ decision.title }} - DecisionOS{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 2rem;">
+    <a href="{% url 'decisions:dashboard' %}" style="color: var(--accent); text-decoration: none;">← Back to Dashboard</a>
+</div>
+
+<!-- DECISION HEADER -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.5rem;">
+        <div style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <h2 style="margin: 0;">{{ decision.title }}</h2>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                {% if decision.status == 'draft' %}
+                <span class="badge badge-draft">Draft</span>
+                {% elif decision.status == 'review' %}
+                <span class="badge" style="background: rgba(0, 204, 255, 0.2); color: #00ccff;">In Review</span>
+                {% elif decision.status == 'approved' %}
+                <span class="badge badge-active">Approved</span>
+                {% elif decision.status == 'implemented' %}
+                <span class="badge badge-completed">Implemented</span>
+                {% endif %}
+                
+                {% if decision.priority == 'critical' %}
+                <span class="badge" style="background: rgba(255, 51, 51, 0.2); color: var(--danger);">Critical</span>
+                {% elif decision.priority == 'high' %}
+                <span class="badge" style="background: rgba(255, 170, 0, 0.2); color: var(--warning);">High</span>
+                {% elif decision.priority == 'medium' %}
+                <span class="badge" style="background: rgba(0, 255, 136, 0.2); color: var(--accent);">Medium</span>
+                {% else %}
+                <span class="badge" style="background: rgba(160, 160, 160, 0.2); color: var(--text-secondary);">Low</span>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            {% if can_edit %}
+            <a href="{% url 'decisions:decision_edit' decision.pk %}" class="btn btn-secondary">✏️ Edit</a>
+            {% endif %}
+
+            {% if can_approve and decision.status == 'review' %}
+            <form method="post" action="{% url 'decisions:decision_finalize' decision.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn">✅ Finalize & Approve</button>
+            </form>
+            {% endif %}
+
+            {% if can_approve and decision.status == 'approved' %}
+            <button class="btn" onclick="changeStatus('implemented')">🏁 Mark Implemented</button>
+            {% endif %}
+
+            
+            {% if can_approve %}
+            <div class="dropdown" style="position: relative;">
+                <button class="btn" onclick="toggleDropdown()" style="padding: 0.75rem 1.5rem;">
+                    Change Status ▼
+                </button>
+                <div id="statusDropdown" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 0.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; min-width: 200px; z-index: 100;">
+                    <button onclick="changeStatus('draft')" style="width: 100%; padding: 0.75rem 1rem; background: none; border: none; color: var(--text-primary); text-align: left; cursor: pointer;">Draft</button>
+                    <button onclick="changeStatus('review')" style="width: 100%; padding: 0.75rem 1rem; background: none; border: none; color: var(--text-primary); text-align: left; cursor: pointer;">In Review</button>
+                    <button onclick="changeStatus('approved')" style="width: 100%; padding: 0.75rem 1rem; background: none; border: none; color: var(--text-primary); text-align: left; cursor: pointer;">Approved</button>
+                    <button onclick="changeStatus('implemented')" style="width: 100%; padding: 0.75rem 1rem; background: none; border: none; color: var(--text-primary); text-align: left; cursor: pointer;">Implemented</button>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if can_edit %}
+            <a href="{% url 'decisions:decision_delete' decision.pk %}" class="btn btn-danger">🗑️</a>
+            {% endif %}
+        </div>
+    </div>
+    
+    <p style="color: var(--text-secondary); font-size: 1.1rem; margin-bottom: 1.5rem; white-space: pre-wrap;">{{ decision.description }}</p>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+        <div>
+            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.25rem;">Team</div>
+            <div style="font-weight: 600;">{{ decision.team.name }}</div>
+        </div>
+        <div>
+            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.25rem;">Created By</div>
+            <div style="font-weight: 600;">{{ decision.created_by.username }}</div>
+        </div>
+        <div>
+            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.25rem;">Assigned To</div>
+            <div style="font-weight: 600;">{{ decision.assigned_to.username|default:"Unassigned" }}</div>
+        </div>
+        <div>
+            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.25rem;">Created</div>
+            <div style="font-weight: 600;">{{ decision.created_at|date:"d.m.Y H:i" }}</div>
+        </div>
+        <div>
+            <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.25rem;">Duration</div>
+            <div style="font-weight: 600;">{{ decision.duration_days }} days</div>
+        </div>
+    </div>
+</div>
+
+<!-- AI QUALITY CHECK (Phase 2) -->
+{% if can_review %}
+<div class="card" style="background: linear-gradient(135deg, rgba(0, 255, 136, 0.08) 0%, rgba(0, 204, 255, 0.06) 100%); border: 1px solid rgba(0, 255, 136, 0.25);">
+    <div style="display:flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+        <div>
+            <h3 style="margin: 0;">🤖 AI Decision Quality</h3>
+            <p style="margin: 0.25rem 0 0; color: var(--text-secondary);">Find missing info, risks, and concrete next steps.</p>
+        </div>
+        <div style="display:flex; gap:0.75rem; flex-wrap: wrap;">
+            <button class="btn" id="aiQualityBtn" onclick="runQualityCheck()">⚡ Quality Check</button>
+            <button class="btn btn-secondary" id="aiSummaryBtn" onclick="runSummary()">🧾 Executive Summary</button>
+        </div>
+    </div>
+
+    <div id="aiQualityPanel" style="display:none; margin-top: 1.5rem;">
+        <div style="display:flex; align-items:center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+            <div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem;">Quality Score</div>
+                <div style="font-size: 2rem; font-weight: 800;" id="aiQualityScore">—</div>
+            </div>
+            <div style="flex: 1; min-width: 240px;">
+                <div style="height: 10px; background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 999px; overflow:hidden;">
+                    <div id="aiQualityBar" style="height: 100%; width: 0%; background: var(--accent);"></div>
+                </div>
+                <div id="aiQualityHint" style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;"></div>
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-top: 1.25rem;">
+            <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 12px; padding: 1rem;">
+                <h4 style="margin: 0 0 0.75rem;">🧩 Missing Information</h4>
+                <div id="aiMissing" style="color: var(--text-secondary);"></div>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 12px; padding: 1rem;">
+                <h4 style="margin: 0 0 0.75rem;">❓ Questions to Answer</h4>
+                <div id="aiQuestions" style="color: var(--text-secondary);"></div>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 12px; padding: 1rem;">
+                <h4 style="margin: 0 0 0.75rem;">⚠️ Risks & Next Steps</h4>
+                <div id="aiRisks" style="color: var(--text-secondary);"></div>
+                <div id="aiImprovements" style="margin-top: 0.75rem; color: var(--text-secondary);"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="aiSummaryPanel" style="display:none; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.08);">
+        <h4 style="margin:0 0 0.75rem;">🧾 Executive Summary</h4>
+        <div id="aiSummaryText" style="white-space: pre-wrap; color: var(--text-secondary);"></div>
+    </div>
+
+    <div id="aiError" style="display:none; margin-top: 1rem; color: var(--danger);"></div>
+</div>
+{% endif %}
+
+<!-- REVIEW SECTION -->
+{% if can_review and decision.status == 'review' %}
+<div class="card">
+    <h3 style="margin-bottom: 1.5rem;">📝 Submit Review</h3>
+    
+    {% if user_review %}
+    <div style="padding: 1.5rem; background: rgba(0, 255, 136, 0.1); border-radius: 8px; margin-bottom: 1.5rem;">
+        <strong style="color: var(--accent);">✓ You already reviewed this decision</strong>
+        <div style="margin-top: 0.5rem; color: var(--text-secondary);">
+            Status: {{ user_review.get_status_display }} • {{ user_review.reviewed_at|date:"d.m.Y H:i" }}
+        </div>
+        {% if user_review.comment %}
+        <div style="margin-top: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px;">
+            {{ user_review.comment }}
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <form method="post" action="{% url 'decisions:decision_submit_review' decision.pk %}">
+        {% csrf_token %}
+        <div class="form-group">
+            <label>Review Decision</label>
+            <select name="review_status" class="form-control" required>
+                <option value="">Select Status</option>
+                <option value="approved">✅ Approve</option>
+                <option value="changes_requested">🔄 Request Changes</option>
+                <option value="rejected">❌ Reject</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>Comment</label>
+            <textarea name="comment" class="form-control" rows="4" placeholder="Provide your feedback..."></textarea>
+        </div>
+        
+        <button type="submit" class="btn">Submit Review</button>
+    </form>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- REVIEWS -->
+{% if reviews %}
+<div class="card">
+    <h3 style="margin-bottom: 1.5rem;">👥 Reviews ({{ reviews.count }})</h3>
+    {% for review in reviews %}
+    <div style="padding: 1.5rem; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+            <strong>{{ review.reviewer.username }}</strong>
+            {% if review.status == 'approved' %}
+            <span class="badge badge-active">Approved</span>
+            {% elif review.status == 'rejected' %}
+            <span class="badge" style="background: rgba(255, 51, 51, 0.2); color: var(--danger);">Rejected</span>
+            {% elif review.status == 'changes_requested' %}
+            <span class="badge" style="background: rgba(255, 170, 0, 0.2); color: var(--warning);">Changes Requested</span>
+            {% else %}
+            <span class="badge" style="background: rgba(160, 160, 160, 0.2); color: var(--text-secondary);">Pending</span>
+            {% endif %}
+        </div>
+        <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">
+            {{ review.reviewed_at|date:"d.m.Y H:i"|default:"Not yet reviewed" }}
+        </div>
+        {% if review.comment %}
+        <div style="color: var(--text-primary);">{{ review.comment }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- COMMENTS -->
+<div class="card">
+    <h3 style="margin-bottom: 1.5rem;">💬 Comments ({{ comments|length }})</h3>
+
+    <form id="commentForm" onsubmit="addComment(event)" style="margin-bottom: 2rem;">
+        {% csrf_token %}
+        <input type="hidden" id="parentId" name="parent_id" value="">
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <input type="text" id="commentText" name="text" placeholder="Add a comment... (use @username to mention)" class="form-control" style="flex: 1; margin: 0;">
+            <button type="submit" class="btn">Post</button>
+        </div>
+        <div id="replyBanner" style="display:none; margin-top:0.75rem; color: var(--text-secondary); font-size:0.9rem;">
+            Replying to <span id="replyToUser"></span>
+            <button type="button" class="btn btn-secondary" style="margin-left:0.75rem;" onclick="clearReply()">Cancel</button>
+        </div>
+    </form>
+
+    <div id="commentsList">
+        {% for comment, depth in threaded_comments %}
+        <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 1rem; margin-left: calc({{ depth }} * 1.25rem);">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <strong>{{ comment.user.username }}</strong>
+                <span style="color: var(--text-secondary); font-size: 0.85rem;">{{ comment.created_at|date:"d.m.Y H:i" }}</span>
+            </div>
+            <div style="white-space: pre-wrap;">{{ comment.text }}</div>
+            <div style="margin-top:0.75rem;">
+                <button type="button" class="btn btn-secondary" onclick="setReply('{{ comment.id }}','{{ comment.user.username }}')">Reply</button>
+            </div>
+        </div>
+        {% empty %}
+        <div style="color: var(--text-secondary);">No comments yet. Be the first to comment.</div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- AUDIT LOG -->
+<div class="card">
+    <h3 style="margin-bottom: 1.5rem;">📜 Audit Trail</h3>
+    <div style="max-height: 400px; overflow-y: auto;">
+        {% for log in audit_logs %}
+        <div style="padding: 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between;">
+            <div>
+                <strong>{{ log.user.username|default:"System" }}</strong>
+                <span style="color: var(--text-secondary); margin-left: 1rem;">{{ log.get_action_display }}</span>
+                <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem;">{{ log.details }}</div>
+            </div>
+            <div style="color: var(--text-secondary); font-size: 0.85rem; white-space: nowrap;">
+                {{ log.timestamp|date:"d.m.Y H:i" }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+function toggleDropdown() {
+    const dropdown = document.getElementById('statusDropdown');
+    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function changeStatus(status) {
+    fetch('{% url "decisions:decision_change_status" decision.pk %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: `status=${status}`
+    }).then(() => location.reload());
+}
+
+function setAIError(message) {
+    const el = document.getElementById('aiError');
+    el.textContent = message;
+    el.style.display = message ? 'block' : 'none';
+}
+
+function listToHtml(items) {
+    if (!items || items.length === 0) return '<div style="color: var(--text-secondary);">—</div>';
+    return '<ul style="margin:0; padding-left: 1.2rem;">' + items.map(x => `<li style="margin: 0.35rem 0;">${x}</li>`).join('') + '</ul>';
+}
+
+function missingToHtml(missing) {
+    if (!missing || missing.length === 0) return '<div style="color: var(--accent);">✅ Looks complete.</div>';
+    return '<ul style="margin:0; padding-left: 1.2rem;">' + missing.map(m => {
+        const item = (m.item || m).toString();
+        const why = (m.why || '').toString();
+        return `<li style="margin: 0.5rem 0;"><strong>${item}</strong>${why ? `<div style="margin-top:0.15rem; color: var(--text-secondary); font-size: 0.9rem;">${why}</div>` : ''}</li>`;
+    }).join('') + '</ul>';
+}
+
+function scoreHint(score) {
+    if (score >= 85) return 'Strong decision record — ready for review.';
+    if (score >= 70) return 'Good, but consider addressing the missing items.';
+    if (score >= 50) return 'Needs more detail before review to avoid back-and-forth.';
+    return 'High risk of unclear outcomes — add context and alternatives.';
+}
+
+async function runQualityCheck() {
+    const btn = document.getElementById('aiQualityBtn');
+    const panel = document.getElementById('aiQualityPanel');
+    const scoreEl = document.getElementById('aiQualityScore');
+    const bar = document.getElementById('aiQualityBar');
+    const hint = document.getElementById('aiQualityHint');
+
+    setAIError('');
+    btn.disabled = true;
+    btn.textContent = '⏳ Checking...';
+
+    try {
+        const resp = await fetch('{% url "decisions:api_ai_quality_check" decision.pk %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        });
+        const data = await resp.json();
+        if (!data.success) {
+            setAIError(data.message || 'Quality check failed. Configure OPENAI_API_KEY in .env if you want AI enrichment.');
+            return;
+        }
+
+        const q = data.quality || {};
+        const score = Number.isFinite(q.score) ? q.score : 0;
+        scoreEl.textContent = `${score}/100`;
+        bar.style.width = `${Math.max(0, Math.min(100, score))}%`;
+        hint.textContent = scoreHint(score);
+
+        document.getElementById('aiMissing').innerHTML = missingToHtml(q.missing_information);
+        document.getElementById('aiQuestions').innerHTML = listToHtml(q.questions);
+        document.getElementById('aiRisks').innerHTML = listToHtml(q.risks);
+        document.getElementById('aiImprovements').innerHTML = q.suggested_improvements && q.suggested_improvements.length
+            ? ('<h5 style="margin: 0.75rem 0 0.5rem;">✅ Suggested Improvements</h5>' + listToHtml(q.suggested_improvements))
+            : '';
+
+        panel.style.display = 'block';
+    } catch (e) {
+        setAIError('Quality check failed. Configure OPENAI_API_KEY in .env for AI enrichment.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '⚡ Quality Check';
+    }
+}
+
+async function runSummary() {
+    const btn = document.getElementById('aiSummaryBtn');
+    const panel = document.getElementById('aiSummaryPanel');
+    const text = document.getElementById('aiSummaryText');
+
+    setAIError('');
+    btn.disabled = true;
+    btn.textContent = '⏳ Summarizing...';
+
+    try {
+        const resp = await fetch('{% url "decisions:api_ai_generate_summary" decision.pk %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        });
+        const data = await resp.json();
+        if (!data.success) {
+            setAIError(data.message || 'Summary generation failed.');
+            return;
+        }
+        text.textContent = data.summary || '';
+        panel.style.display = 'block';
+    } catch (e) {
+        setAIError('Summary generation failed. Configure OPENAI_API_KEY in .env if needed.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🧾 Executive Summary';
+    }
+}
+
+function addComment(e) {
+    e.preventDefault();
+    const textEl = document.getElementById('commentText');
+    const parentEl = document.getElementById('parentId');
+    const text = (textEl.value || '').trim();
+    const parent_id = parentEl.value || '';
+
+    if (!text) return;
+
+    const body = new URLSearchParams();
+    body.append('text', text);
+    if (parent_id) body.append('parent_id', parent_id);
+
+    fetch("{% url 'decisions:decision_add_comment' decision.id %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: body.toString()
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'Failed to post comment.');
+        }
+    })
+    .catch(() => alert('Failed to post comment.'));
+}
+
+function setReply(parentId, username) {
+    document.getElementById('parentId').value = parentId;
+    document.getElementById('replyToUser').innerText = '@' + username;
+    document.getElementById('replyBanner').style.display = 'block';
+    document.getElementById('commentText').focus();
+}
+
+function clearReply() {
+    document.getElementById('parentId').value = '';
+    document.getElementById('replyBanner').style.display = 'none';
+    document.getElementById('replyToUser').innerText = '';
+}
+
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.dropdown')) {
+        document.getElementById('statusDropdown').style.display = 'none';
+    }
+});
+</script>
+{% endblock %}

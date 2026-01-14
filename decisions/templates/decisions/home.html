@@ -1,0 +1,24 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>DecisionOS</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        h1 { color: #007bff; }
+        .btn { display: inline-block; color: white; background: #007bff; text-decoration: none; padding: 15px 30px; border-radius: 5px; margin: 10px 5px; }
+        .btn:hover { background: #0056b3; }
+        .btn-secondary { background: #6c757d; }
+        .btn-secondary:hover { background: #545b62; }
+    </style>
+</head>
+<body>
+    <h1>🎯 DecisionOS</h1>
+    <p>Willkommen bei DecisionOS!</p>
+    <p>Eingeloggt als: <strong>{{ user.username }}</strong></p>
+    
+    <div style="margin-top: 30px;">
+        <a href="{% url 'admin:index' %}" class="btn">→ Admin Panel</a>
+        <a href="{% url 'decisions:logout' %}" class="btn btn-secondary">Logout</a>
+    </div>
+</body>
+</html>

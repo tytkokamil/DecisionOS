@@ -1,0 +1,158 @@
+﻿from django.db import models
+from django.contrib.auth import get_user_model
+User = get_user_model()
+from django.contrib.auth.models import User
+from django.utils import timezone
+
+class Team(models.Model):
+    """Organization Teams/Departments"""
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return self.name
+
+class TeamMember(models.Model):
+    """Team membership with roles"""
+    ROLE_CHOICES = [
+        ('admin', 'Admin'),
+        ('decision_maker', 'Entscheider'),
+        ('reviewer', 'Reviewer'),
+        ('observer', 'Beobachter'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    joined_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['user', 'team']
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.team.name} ({self.role})"
+
+class Decision(models.Model):
+    """Core Decision Object"""
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('review', 'In Review'),
+        ('approved', 'Approved'),
+        ('implemented', 'Implemented'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    PRIORITY_CHOICES = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('critical', 'Critical'),
+    ]
+    
+    # Basic Info
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='medium')
+    
+    # Ownership
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_decisions')
+    team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_decisions')
+    
+    # Dates
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    due_date = models.DateTimeField(null=True, blank=True)
+    decision_date = models.DateTimeField(null=True, blank=True)
+    implemented_date = models.DateTimeField(null=True, blank=True)
+    
+    # Metadata
+    version = models.IntegerField(default=1)
+    tags = models.CharField(max_length=500, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.title} ({self.get_status_display()})"
+    
+    def duration_days(self):
+        if self.decision_date:
+            return (self.decision_date - self.created_at).days
+        return (timezone.now() - self.created_at).days
+
+class DecisionVersion(models.Model):
+    decision = models.ForeignKey(Decision, on_delete=models.CASCADE, related_name='versions')
+    version = models.IntegerField()
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    status = models.CharField(max_length=20)
+    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+    change_summary = models.TextField(blank=True)
+    
+    class Meta:
+        ordering = ['-version']
+
+class Review(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('changes_requested', 'Changes Requested'),
+    ]
+    
+    decision = models.ForeignKey(Decision, on_delete=models.CASCADE, related_name='reviews')
+    reviewer = models.ForeignKey(User, on_delete=models.CASCADE)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        unique_together = ['decision', 'reviewer']
+        ordering = ['-created_at']
+
+class Comment(models.Model):
+    decision = models.ForeignKey(Decision, on_delete=models.CASCADE, related_name='comments')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['created_at']
+
+class AuditLog(models.Model):
+    ACTION_CHOICES = [
+        ('created', 'Created'),
+        ('updated', 'Updated'),
+        ('status_changed', 'Status Changed'),
+        ('assigned', 'Assigned'),
+        ('reviewed', 'Reviewed'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('implemented', 'Implemented'),
+    ]
+    
+    decision = models.ForeignKey(Decision, on_delete=models.CASCADE, related_name='audit_logs')
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    details = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-timestamp']
+
+class AIAnalysis(models.Model):
+    decision = models.ForeignKey(Decision, on_delete=models.CASCADE, related_name='ai_analyses')
+    analysis_type = models.CharField(max_length=50)
+    content = models.TextField()
+    confidence_score = models.FloatField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
